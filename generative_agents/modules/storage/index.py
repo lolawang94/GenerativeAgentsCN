@@ -58,7 +58,7 @@ class LlamaIndex:
         exclude_embedding_keys=None,
         id=None,
     ):
-        while True:
+        for _ in range(10):
             try:
                 metadata = metadata or {}
                 exclude_llm_keys = exclude_llm_keys or list(metadata.keys())
@@ -77,6 +77,7 @@ class LlamaIndex:
             except Exception as e:
                 print(f"LlamaIndex.add_node() caused an error: {e}")
                 time.sleep(5)
+        raise RuntimeError(f"LlamaIndex.add_node() failed after 10 retries")
 
     def has_node(self, node_id):
         return node_id in self._index.docstore.docs
@@ -140,7 +141,7 @@ class LlamaIndex:
             "refine_template": refine_template,
             "filters": filters,
         }
-        while True:
+        for _ in range(10):
             try:
                 if query_creator:
                     query_engine = query_creator(retriever=self._index.as_retriever(**kwargs))
@@ -150,6 +151,7 @@ class LlamaIndex:
             except Exception as e:
                 print(f"LlamaIndex.query() caused an error: {e}")
                 time.sleep(5)
+        raise RuntimeError(f"LlamaIndex.query() failed after 10 retries")
 
     def save(self, path=None):
         path = path or self._path

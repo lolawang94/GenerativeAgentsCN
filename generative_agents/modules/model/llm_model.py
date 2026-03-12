@@ -109,7 +109,8 @@ class OllamaLLMModel(LLMModel):
             url=f"{self._base_url}/chat/completions",
             headers=headers,
             json=params,
-            stream=False
+            stream=False,
+            timeout=300
         )
         return response.json()
 

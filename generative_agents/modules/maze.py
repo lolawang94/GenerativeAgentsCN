@@ -149,6 +149,8 @@ class Maze:
                         map[c[1]][c[0]] = map[f[1]][f[0]] + 1
                         new_frontier.append(c)
                         visited.add(c)
+            if not new_frontier:
+                return []
             frontier = new_frontier
         step = map[dst_coord[1]][dst_coord[0]]
         path = [dst_coord]
