@@ -1,9 +1,8 @@
-
 import random
 import datetime
 import re
 from string import Template
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from collections import namedtuple
 from typing import List, Tuple
 from modules import utils
@@ -54,7 +53,7 @@ class Scratch:
         )
 
         class PoignancyEventResponse(BaseModel):
-            res: int
+            res: int = Field(description="事件的情感强度评分，整数，范围1到10")
 
         return Result(prompt, None, random.choice(list(range(10))) + 1, PoignancyEventResponse)
 
@@ -69,7 +68,7 @@ class Scratch:
         )
 
         class PoignancyChatResponse(BaseModel):
-            res: int
+            res: int = Field(description="对话的情感强度评分，整数，范围1到10")
 
         return Result(prompt, None, random.choice(list(range(10))) + 1, PoignancyChatResponse)
 
@@ -84,7 +83,7 @@ class Scratch:
         )
 
         class wakeupResponse(BaseModel):
-            res: int
+            res: int = Field(description="起床时间，24小时制的小时数，整数，范围0到11")
 
         def _callback(response):
             value = response
@@ -106,7 +105,11 @@ class Scratch:
         )
 
         class schedule_initResponse(BaseModel):
-            res: list[str]
+            res: list[str] = Field(description="按时间顺序排列的日程活动列表，每项为简短的活动描述")
+
+        def _callback(response):
+            assert len(response) >= 3, "schedule_init: too few items"
+            return response
 
         failsafe = [
             "早上6点起床并完成早餐的例行工作",
@@ -117,7 +120,7 @@ class Scratch:
             "晚上7点放松一下，看电视",
             "晚上11点睡觉",
         ]
-        return Result(prompt, None, failsafe, schedule_initResponse)
+        return Result(prompt, _callback, failsafe, schedule_initResponse)
 
     def prompt_schedule_daily(self, wake_up, daily_schedule):
         hourly_schedule = ""
@@ -137,7 +140,7 @@ class Scratch:
         )
 
         class schedule_dailyResponse(BaseModel):
-            res: dict[str, str]
+            res: dict[str, str] = Field(description="24小时日程表，键为时间字符串如'8:00'，值为该时段的活动描述")
 
         failsafe = {
             "6:00": "起床并完成早晨的例行工作",
@@ -190,8 +193,8 @@ class Scratch:
             }
         )
 
-        class schedule_decomposeResponse(BaseModel):  
-            res: List[Tuple[str, int]]
+        class schedule_decomposeResponse(BaseModel):
+            res: List[Tuple[str, int]] = Field(description="子任务列表，每项为 [活动描述, 时长分钟数] 的元组")
 
         def _callback(response):
             left = plan["duration"] - sum([s[1] for s in response])
@@ -246,7 +249,7 @@ class Scratch:
         )
 
         class schedule_reviseResponse(BaseModel):
-            res: List[Tuple[str, str, str]]
+            res: List[Tuple[str, str, str]] = Field(description="调整后的完整日程列表，每项为 [开始时间, 结束时间, 活动描述] 的元组，时间格式为 HH:MM")
 
         def _callback(response):  
             # response已经是List[Tuple[str, str, str]]类型  
@@ -295,7 +298,7 @@ class Scratch:
         failsafe = random.choice(sectors)
 
         class determine_sectorResponse(BaseModel):
-            res: str
+            res: str = Field(description="从给定列表中选出的目标区域名称，必须与列表中的某项完全一致")
 
         def _callback(response):  
             # response已经是str类型  
@@ -326,8 +329,8 @@ class Scratch:
         arenas = spatial.get_leaves(address)
         failsafe = random.choice(arenas)
 
-        class determine_arenaResponse(BaseModel):  
-            res: str
+        class determine_arenaResponse(BaseModel):
+            res: str = Field(description="从给定列表中选出的目标场所名称，必须与列表中的某项完全一致")
 
         def _callback(response):
             return response if response in arenas else failsafe
@@ -348,47 +351,13 @@ class Scratch:
         failsafe = random.choice(objects)
 
         class determine_objectResponse(BaseModel):
-            res: str
+            res: str = Field(description="从给定列表中选出的最相关对象名称，必须与列表中的某项完全一致")
         def _callback(response):
             # pattern = ["The most relevant object from the Objects is: <(.+?)>", "<(.+?)>"]
             return response if response in objects else failsafe
 
         return Result(prompt, _callback, failsafe, determine_objectResponse)
-    """
-    def prompt_describe_emoji(self, describe):
-        class describe_emojiResponse(BaseModel):
-            res: str
 
-        prompt = self.build_prompt(
-            "describe_emoji",
-            {
-                "action": describe,
-            }
-        )
-
-        def _callback(response):
-            # 正则表达式：匹配大多数emoji
-            emoji_pattern = u"([\U0001F600-\U0001F64F]|"   # 表情符号
-            emoji_pattern += u"[\U0001F300-\U0001F5FF]|"   # 符号和图标
-            emoji_pattern += u"[\U0001F680-\U0001F6FF]|"   # 运输和地图符号
-            emoji_pattern += u"[\U0001F700-\U0001F77F]|"   # 午夜符号
-            emoji_pattern += u"[\U0001F780-\U0001F7FF]|"   # 英镑符号
-            emoji_pattern += u"[\U0001F800-\U0001F8FF]|"   # 合成扩展
-            emoji_pattern += u"[\U0001F900-\U0001F9FF]|"   # 补充符号和图标
-            emoji_pattern += u"[\U0001FA00-\U0001FA6F]|"   # 补充符号和图标
-            emoji_pattern += u"[\U0001FA70-\U0001FAFF]|"   # 补充符号和图标
-            emoji_pattern += u"[\U00002702-\U000027B0]+)"  # 杂项符号
-
-            emoji = re.compile(emoji_pattern, flags=re.UNICODE).findall(response)
-            if len(emoji) > 0:
-                response = "Emoji: " + "".join(i for i in emoji)
-            else:
-                response = ""
-
-            return parse_llm_output(response, ["Emoji: (.*)"])[:3]
-
-        return {"prompt": prompt, "callback": _callback, "failsafe": "💭", "retry": 1}
-    """
     def prompt_describe_event(self, subject, describe, address, emoji=None):
         prompt = self.build_prompt(
             "describe_event",
@@ -404,7 +373,7 @@ class Scratch:
             subject, "此时", e_describe, describe=describe, address=address, emoji=emoji
         )
         class describe_eventResponse(BaseModel):
-            res: List[Tuple[str, str, str]]
+            res: List[Tuple[str, str, str]] = Field(description="动作的三元组列表，每项为 [主语, 谓语, 宾语]")
 
         def _callback(response):  
             # response已经是List[Tuple[str, str, str]]类型  
@@ -426,11 +395,18 @@ class Scratch:
             }
         )
 
-        class describe_objectResponse(BaseModel):
-            res: str
+        class DescribeObjectResponse(BaseModel):
+            res: str = Field(description="物品的状态描述，不超过10个字的短句，不要包含物品名称")
+
+        def _callback(response):
+            response = response.strip()
+            # 移除 "物品名" 前缀
+            if response.startswith(obj):
+                response = response[len(obj):].strip()
+            return response or failsafe
 
         failsafe = "空闲"
-        return Result(prompt, None, failsafe, describe_objectResponse)
+        return Result(prompt, _callback, failsafe, DescribeObjectResponse)
 
     def prompt_decide_chat(self, agent, other, focus, chats):
         def _status_des(a):
@@ -463,10 +439,15 @@ class Scratch:
         )
 
         class decide_chatResponse(BaseModel):
-            res: bool
+            res: bool = Field(description="是否主动发起对话，true 表示会主动对话，false 表示不会")
+
+        def _callback(response):
+            if isinstance(response, bool):
+                return response
+            return str(response).strip().lower() in ("true", "yes", "是", "1")
 
         failsafe = False
-        return Result(prompt, None, failsafe, decide_chatResponse)
+        return Result(prompt, _callback, failsafe, decide_chatResponse)
 
     def prompt_decide_chat_terminate(self, agent, other, chats):
         conversation = "\n".join(["{}: {}".format(n, u) for n, u in chats])
@@ -484,10 +465,15 @@ class Scratch:
         )
 
         class decide_chat_terminateResponse(BaseModel):
-            res: bool
+            res: bool = Field(description="对话是否已告一段落，true 表示对话结束，false 表示对话仍在继续")
+
+        def _callback(response):
+            if isinstance(response, bool):
+                return response
+            return str(response).strip().lower() in ("true", "yes", "是", "1")
 
         failsafe = False
-        return Result(prompt, None, failsafe, decide_chat_terminateResponse)
+        return Result(prompt, _callback, failsafe, decide_chat_terminateResponse)
 
     def prompt_decide_wait(self, agent, other, focus):
         example1 = self.build_prompt(
@@ -560,7 +546,7 @@ class Scratch:
         )
 
         class decide_waitResponse(BaseModel):
-            res: str
+            res: str = Field(description="选择的选项，'A' 表示等待，'B' 表示继续当前行动")
 
         def _callback(response):
             return "A" in response
@@ -581,9 +567,12 @@ class Scratch:
         )
         failsafe = agent.name + " 正在看着 " + other_name
         class summarize_relationResponse(BaseModel):
-            res: str
+            res: str = Field(description="一句话描述两人之间的关系，以第三人称表述")
 
-        return Result(prompt, None, failsafe, summarize_relationResponse)
+        def _callback(response):
+            return response.strip() or failsafe
+
+        return Result(prompt, _callback, failsafe, summarize_relationResponse)
 
     def prompt_generate_chat(self, agent, other, relation, chats):
         focus = [relation, other.get_event().get_describe()]
@@ -628,11 +617,18 @@ class Scratch:
             }
         )
 
-        class generate_chat(BaseModel):  
-            res: str
+        class generate_chat(BaseModel):
+            res: str = Field(description="角色说出的对话内容，1到3句话")
+
+        def _callback(response):
+            response = response.strip()
+            # 移除 "名字：" 前缀
+            if response.startswith(agent.name + "：") or response.startswith(agent.name + ":"):
+                response = response[len(agent.name) + 1:].strip()
+            return response or failsafe
 
         failsafe = "嗯"
-        return Result(prompt, None, failsafe, generate_chat)
+        return Result(prompt, _callback, failsafe, generate_chat)
 
     def prompt_generate_chat_check_repeat(self, agent, chats, content):
         conversation = "\n".join(["{}: {}".format(n, u) for n, u in chats])
@@ -640,8 +636,8 @@ class Scratch:
                 conversation or "[对话尚未开始]"
         )
 
-        class generate_chat_check_repeatResponse(BaseModel):  
-            res: bool
+        class generate_chat_check_repeatResponse(BaseModel):
+            res: bool = Field(description="新对话内容是否与历史记录重复，true 表示重复，false 表示不重复")
 
         prompt = self.build_prompt(
             "generate_chat_check_repeat",
@@ -651,8 +647,14 @@ class Scratch:
                 "agent": agent.name,
             }
         )
+
+        def _callback(response):
+            if isinstance(response, bool):
+                return response
+            return str(response).strip().lower() in ("true", "yes", "是", "1")
+
         failsafe = False
-        return Result(prompt, None, failsafe, generate_chat_check_repeatResponse)
+        return Result(prompt, _callback, failsafe, generate_chat_check_repeatResponse)
 
     def prompt_summarize_chats(self, chats):
         conversation = "\n".join(["{}: {}".format(n, u) for n, u in chats])
@@ -664,8 +666,8 @@ class Scratch:
             }
         )
 
-        class summarize_chatsResponse(BaseModel):  
-            res: str
+        class summarize_chatsResponse(BaseModel):
+            res: str = Field(description="对话内容的简短摘要，一句话概括对话主题")
 
         def _callback(response):
             return response.strip()
@@ -686,15 +688,19 @@ class Scratch:
             }
         )
 
-        class reflect_focusResponse(BaseModel):  
-            res: List[str]
+        class reflect_focusResponse(BaseModel):
+            res: List[str] = Field(description="需要深入思考的问题列表，每项为一个问题")
+
+        def _callback(response):
+            assert len(response) >= 1, "reflect_focus: empty list"
+            return response
 
         failsafe = [
                 "{} 是谁？".format(self.name),
                 "{} 住在哪里？".format(self.name),
                 "{} 今天要做什么？".format(self.name),
             ]
-        return Result(prompt, None, failsafe, reflect_focusResponse)
+        return Result(prompt, _callback, failsafe, reflect_focusResponse)
 
     def prompt_reflect_insights(self, nodes, topk):
         prompt = self.build_prompt(
@@ -705,8 +711,8 @@ class Scratch:
             }
         )
 
-        class reflect_insightsResponse(BaseModel):  
-            res: List[Tuple[str, str]]
+        class reflect_insightsResponse(BaseModel):
+            res: List[Tuple[str, str]] = Field(description="洞察列表，每项为 [洞察内容, 相关节点索引的逗号分隔字符串如'1,2,3'] 的元组")
 
         def _callback(response):  
             insights = []  
@@ -736,11 +742,14 @@ class Scratch:
             }
         )
 
-        class reflect_chat_planingResponse(BaseModel):  
-            res: str
+        class reflect_chat_planingResponse(BaseModel):
+            res: str = Field(description="从对话中提取的对角色计划的影响或启发，一句话描述")
+
+        def _callback(response):
+            return response.strip() or failsafe
 
         failsafe = f"{self.name} 进行了一次对话"
-        return Result(prompt, None, failsafe, reflect_chat_planingResponse)
+        return Result(prompt, _callback, failsafe, reflect_chat_planingResponse)
 
     def prompt_reflect_chat_memory(self, chats):
         all_chats = "\n".join(["{}: {}".format(n, c) for n, c in chats])
@@ -752,11 +761,14 @@ class Scratch:
                 "agent": self.name,
             }
         )
-        class reflect_chat_memoryResponse(BaseModel):  
-            res: str
+        class reflect_chat_memoryResponse(BaseModel):
+            res: str = Field(description="从对话中提取的值得记忆的内容，一句话描述")
+
+        def _callback(response):
+            return response.strip() or failsafe
 
         failsafe = f"{self.name} 进行了一次对话"
-        return Result(prompt, None, failsafe, reflect_chat_memoryResponse)
+        return Result(prompt, _callback, failsafe, reflect_chat_memoryResponse)
 
     def prompt_retrieve_plan(self, nodes):
         statements = [
@@ -773,10 +785,14 @@ class Scratch:
         )
 
         class retrieve_planResponse(BaseModel):
-            res: List[str]
+            res: List[str] = Field(description="从记忆中检索出的相关计划列表，每项为一条计划描述")
+
+        def _callback(response):
+            assert len(response) >= 1, "retrieve_plan: empty list"
+            return response
 
         failsafe = [r.describe for r in random.choices(nodes, k=5)]
-        return Result(prompt, None, failsafe, retrieve_planResponse)
+        return Result(prompt, _callback, failsafe, retrieve_planResponse)
 
     def prompt_retrieve_thought(self, nodes):
         statements = [
@@ -792,10 +808,13 @@ class Scratch:
         )
 
         class retrieve_thoughtResponse(BaseModel):
-            res: str
+            res: str = Field(description="从记忆中检索出的相关思考内容，一句话总结")
+
+        def _callback(response):
+            return response.strip() or failsafe
 
         failsafe = "{} 应该遵循昨天的日程".format(self.name)
-        return Result(prompt, None, failsafe, retrieve_thoughtResponse)
+        return Result(prompt, _callback, failsafe, retrieve_thoughtResponse)
 
     def prompt_retrieve_currently(self, plan_note, thought_note):
         time_stamp = (
@@ -815,8 +834,11 @@ class Scratch:
         )
 
         class retrieve_currentlyResponse(BaseModel):
-            res: str
+            res: str = Field(description="角色当前状态的更新描述，基于过去的计划和思考")
+
+        def _callback(response):
+            return response.strip() or failsafe
 
         failsafe = self.currently
 
-        return Result(prompt, None, failsafe, retrieve_currentlyResponse)
+        return Result(prompt, _callback, failsafe, retrieve_currentlyResponse)
