@@ -1,0 +1,32 @@
+这个项目主要能做的事和命令
+启动模拟小镇：
+python start.py --name sim-test --start "20250213-09:30" --step 10 --stride 10
+含义：
+--name     模拟名称，会写入 results/checkpoints/<name>
+--start    虚拟小镇起始时间
+--step     模拟多少步
+--stride   每步对应多少分钟
+--verbose  日志等级，默认 debug
+--log      写日志文件名，可选
+从断点继续模拟：
+python start.py --name sim-test --resume --step 2 --stride 10
+注意：--resume 要求已经存在 results/checkpoints/sim-test。
+压缩/生成回放数据：
+python compress.py --name sim-test
+输出：
+results/compressed/sim-test/movement.json
+results/compressed/sim-test/simulation.md
+
+
+启动回放服务：
+python replay.py
+浏览器打开：
+http://127.0.0.1:5000/?name=sim-test
+可带参数：
+http://127.0.0.1:5000/?name=sim-test&step=0&speed=2&zoom=0.8
+看内置示例回放：
+python replay.py
+然后打开：
+http://127.0.0.1:5000/?name=example&step=0&speed=2&zoom=0.6
+也可以直接看：
+generative_agents/results/compressed/example/simulation.md
